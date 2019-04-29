@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BenchmarkCore": {
+      "commandName": "Project",
+      "commandLineArgs": "MyBench"
+    }
+  }
+}

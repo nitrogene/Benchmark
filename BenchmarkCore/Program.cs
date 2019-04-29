@@ -24,7 +24,7 @@ using System.Security.Authentication;
 using System.Net.Http;
 using System.Reflection;
 
-// dotnet run -c Release -f net472
+// dotnet run -c Release -f net472 MyBench
 
 namespace BenchmarkCore
 {
@@ -84,9 +84,9 @@ namespace BenchmarkCore
             new Random(42).NextBytes(data);
 
             dic = new Dictionary<byte, int>();
-            for (byte i = 0; i <= byte.MaxValue; ++i)
+            for (int i = 0; i <= byte.MaxValue; ++i)
             {
-                dic[i] = 0;
+                dic[(byte)i] = 0;
             }
         }
 
@@ -544,58 +544,29 @@ namespace BenchmarkCore
     {
         public static void Main(string[] args)
         {
-            if(args==null || args.Length!=2)
+            var allTypes = Assembly.GetExecutingAssembly().GetTypes().Where(u => u.IsPublic && u.Name != "Program" && u.Name != "MainConfig").ToList();
+
+            if (args == null || args.Length > 1 || (args.Length == 1 && allTypes.Find(u => u.Name == args[0]) == null))
             {
                 Console.WriteLine("Available benchmarks:");
-                Assembly.GetExecutingAssembly().GetTypes().Where(u => u.IsPublic && u.Name!="Program" && u.Name != "MainConfig").ToList().ForEach(u => Console.WriteLine(u.Name));
+                allTypes.ForEach(u => Console.WriteLine(u));
                 return;
             }
 
-            switch(args[1])
+            if (args.Length == 1)
             {
-                case "List":
-                    
-                    break;
-
-                case "Md5VsSha256":
-                    BenchmarkRunner.Run<Md5VsSha256>();
-                    break;
-
-                case "MyBench":
-                    BenchmarkRunner.Run<MyBench>();
-                    break;
-
-                case "JIT":
-                    BenchmarkRunner.Run<JIT>();
-                    break;
-
-                case "Threading":
-                    BenchmarkRunner.Run<Threading>();
-                    break;
-
-                case "String":
-                    BenchmarkRunner.Run<String>();
-                    break;
-
-                case "FormattingAndParsing":
-                    BenchmarkRunner.Run<FormattingAndParsing>();
-                    break;
-
-                case "Networking":
-                    BenchmarkRunner.Run<Networking>();
-                    break;
-
-                case "Networking2":
-                    BenchmarkRunner.Run<Networking2>();
-                    break;
-
-                case "AndMore":
-                    BenchmarkRunner.Run<AndMore>();
-                    break;
-
-                default:
-                    Console.WriteLine("Unknown argument!");
-                    break;
+                var bType = allTypes.Find(u => u.Name == args[0]);
+                Console.WriteLine($"Running single benchmark: {bType.Name} ");
+                BenchmarkRunner.Run(bType);
+            }
+            else
+            {
+                // Run all benchmarks 
+                allTypes.ForEach(bType =>
+                {
+                    Console.WriteLine($"Running all benchmarks. Curent {bType.Name} ");
+                    BenchmarkRunner.Run(Assembly.GetExecutingAssembly());
+                });
             }
         }
     }
