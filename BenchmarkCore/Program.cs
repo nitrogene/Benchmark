@@ -22,6 +22,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Net.Http;
+using System.Reflection;
 
 // dotnet run -c Release -f net472
 
@@ -545,11 +546,17 @@ namespace BenchmarkCore
         {
             if(args==null || args.Length!=2)
             {
+                Console.WriteLine("Available benchmarks:");
+                Assembly.GetExecutingAssembly().GetTypes().Where(u => u.IsPublic && u.Name!="Program" && u.Name != "MainConfig").ToList().ForEach(u => Console.WriteLine(u.Name));
                 return;
             }
 
             switch(args[1])
             {
+                case "List":
+                    
+                    break;
+
                 case "Md5VsSha256":
                     BenchmarkRunner.Run<Md5VsSha256>();
                     break;
@@ -584,6 +591,10 @@ namespace BenchmarkCore
 
                 case "AndMore":
                     BenchmarkRunner.Run<AndMore>();
+                    break;
+
+                default:
+                    Console.WriteLine("Unknown argument!");
                     break;
             }
         }
