@@ -564,8 +564,9 @@ namespace BenchmarkCore
                 // Run all benchmarks 
                 allTypes.ForEach(bType =>
                 {
-                    Console.WriteLine($"Running all benchmarks. Curent {bType.Name} ");
-                    BenchmarkRunner.Run(Assembly.GetExecutingAssembly());
+                    Console.WriteLine($"Running all benchmarks. Current {bType.Name} ");
+                    BenchmarkRunner.Run(bType);
+                    Console.WriteLine($"Running all benchmarks. Done {bType.Name} ");
                 });
             }
         }
