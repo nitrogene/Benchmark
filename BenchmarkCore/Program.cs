@@ -23,6 +23,10 @@ using System.Net.Security;
 using System.Security.Authentication;
 using System.Net.Http;
 using System.Reflection;
+using BenchmarkDotNet.Columns;
+using BenchmarkDotNet.Reports;
+using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Exporters;
 
 // dotnet run -c Release -f net472 MyBench
 
@@ -379,7 +383,7 @@ namespace BenchmarkCore
         [Benchmark]
         public void DateTimeOffsetFormatO() => s_dto.ToString("o");
 
-        private static readonly string s_base64String = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce lobortis massa non semper lobortis. Suspendisse potenti. Integer cursus odio vitae metus suscipit, eget elementum lorem facilisis.";
+        private static readonly string s_base64String = "TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4gRHVpcyBzZWQgaXBzdW0gaW4gbWFnbmEgZnJpbmdpbGxhIHVsbGFtY29ycGVyLiBTZWQgdmVsIGp1c3RvIHZpdGFlIGFudGUgZ3JhdmlkYSBwb3N1ZXJlIGVnZXQgc2l0IGFtZXQgdGVsbHVzLiBQcmFlc2VudCB1dCBzdXNjaXBpdCBkb2xvciwgZWdldCBhdWN0b3IgbGliZXJvLiBTZWQgdml0YWUgZHVpIGlkIG5lcXVlIHNvZGFsZXMgYmxhbmRpdCBub24gdmVsIHF1YW0uIEV0aWFtIGRpYW0gc2VtLCBjb21tb2RvIG5lYyBqdXN0byBxdWlzLCBlZ2VzdGFzIGZyaW5naWxsYSB1cm5hLiBEdWlzIG5vbiBhdWd1ZSBwcmV0aXVtLCB2ZW5lbmF0aXMgbGFjdXMgdmVsLCBjb25ndWUgbWFnbmEuIEFsaXF1YW0gZmV1Z2lhdCBwb3J0YSB1cm5hLCB2ZWwgdGluY2lkdW50IHZlbGl0IHZlaGljdWxhIG5lYy4gU2VkIHZpdmVycmEgbWV0dXMgaXBzdW0sIHV0IGNvbmd1ZSBlbGl0IGRpY3R1bSBhYy4gQWVuZWFuIHBvc3VlcmUgZG9sb3Igb3JjaSwgaWQgaW1wZXJkaWV0IG5pc2kgdGVtcG9yIHF1aXMu";
         private static readonly char[] s_base64Chars = s_base64String.ToCharArray();
 
         [Benchmark]
@@ -521,7 +525,8 @@ namespace BenchmarkCore
         [Benchmark]
         public void EnumerateFiles()
         {
-            foreach (string path in Directory.EnumerateFiles(@"d:\", "*.txt", SearchOption.AllDirectories))
+			// Enumerate through local clone of https://github.com/dotnet/wpf.git
+            foreach (string path in Directory.EnumerateFiles(@"D:\Dev\wpf", "*.wpf", SearchOption.AllDirectories))
             {
             }
         }
