@@ -1,5 +1,6 @@
-# Benchmark
-Following [Stephen Toub](https://devblogs.microsoft.com/dotnet/author/toub/) [post from April 2018 on DotNetCore 2.0 and 2.1 benchmarks](https://devblogs.microsoft.com/dotnet/performance-improvements-in-net-core-2-1/), I have decided to update it with latest DotNetCore3.0 preview. Most of the following are taken from his post. 
+
+# Benchmarking DotNetCore 2.1, 2.2,3.0 and CLR 4.7.2
+Following [Stephen Toub](https://devblogs.microsoft.com/dotnet/author/toub/) [post from April 2018 on DotNetCore 2.0 and 2.1 benchmarks](https://devblogs.microsoft.com/dotnet/performance-improvements-in-net-core-2-1/), I have decided to update it with latest DotNetCore3.0 preview. Most of the following are taken from his post. The benchmarking library is [benchmarkdotnet.](https://benchmarkdotnet.org/)
 
 # Experimental setup
 All benchmarks were run on the same computer (Dell XPS 9550, in flight mode, antivirus off):
@@ -18,6 +19,13 @@ Platform=X64  Runtime=Clr
 
 ```
 # Md5VsSha256
+
+        [Benchmark]
+        public byte[] Sha256() => sha256.ComputeHash(data);
+
+        [Benchmark]
+        public byte[] Md5() => md5.ComputeHash(data);
+
 | Method |     Job |     Toolchain |     Mean | Ratio |
 |------- |-------- |-------------- |---------:|------:|
 | Sha256 | Default | .NET Core 2.0 | 49.20 us |  0.52 |
@@ -33,6 +41,31 @@ Platform=X64  Runtime=Clr
 |    Md5 |     Clr |       Default | 24.35 us |  1.00 |
 
 # MyBench
+
+        [Benchmark]
+        public IList<byte> Where() => data.Where(x => x > 20).ToList();
+
+        [Benchmark]
+        public IList<byte> SortedSet() => new SortedSet<byte>(data).ToList();
+
+        [Benchmark]
+        public void Sin()
+        {
+            foreach (var b in data)
+            {
+                Math.Sin(((double)b) / 42.0);
+            }
+        }
+
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var b in data)
+            {
+                dic[b]++;
+            }
+        }
+
 |     Method |     Job |     Toolchain |        Mean | Ratio |
 |----------- |-------- |-------------- |------------:|------:|
 |      Where | Default | .NET Core 2.0 |    45.52 us |  0.37 |
@@ -60,6 +93,73 @@ Platform=X64  Runtime=Clr
 | Dictionary |     Clr |       Default |   289.78 us |  1.00 |
 
 # JIT
+
+        [Benchmark(OperationsPerInvoke = 100_000_000)]
+        public int EqualityComparerInt32()
+        {
+            int[] items = s_intArray;
+
+            for (int i = 0; i < items.Length; i++)
+                if (EqualityComparer<int>.Default.Equals(items[i], -1))
+                    return i;
+
+            return -1;
+        }
+
+        [Benchmark(OperationsPerInvoke = Items)]
+        public int DictionaryContainsValue()
+        {
+            Dictionary<int, int> d = s_dict;
+            int count = 0;
+
+            for (int i = 0; i < Items; i++)
+                if (d.ContainsValue(i))
+                    count++;
+
+            return count;
+        }
+
+        [Benchmark(OperationsPerInvoke = 10_000)]
+        public bool EnumHasFlag()
+        {
+            FileAccess value = FileAccess.ReadWrite;
+            bool result = true;
+
+            for (int i = 0; i < 10_000; i++)
+            {
+                result &= value.HasFlag(FileAccess.Read);
+            }
+
+            return result;
+        }
+
+        [Benchmark]
+        public bool LoopBodyLayout() => StringsAreEqual(
+            "this is a test to see if these strings are equal",
+            "this is a test to see if these strings are equal"
+            );
+
+        [Benchmark(OperationsPerInvoke = 10_000_000)]
+        public int LoweringTESTtoBT()
+        {
+            int y = 0, x = 0;
+
+            while (x++ < 10_000_000)
+                if ((x & (1 << y)) == 0)
+                    y++;
+
+            return y;
+        }
+
+        [Benchmark]
+        public void BoxingAllocations() => BoxingAllocations(default(Dog));
+
+        private void BoxingAllocations<T>(T thing)
+        {
+            if (thing is IAnimal)
+                ((IAnimal)thing).MakeSound();
+        }
+
 |                  Method |     Job |     Toolchain |          Mean | Ratio |
 |------------------------ |-------- |-------------- |--------------:|------:|
 |   EqualityComparerInt32 | Default | .NET Core 2.0 |     2.8902 ns |  1.19 |
@@ -99,6 +199,48 @@ Platform=X64  Runtime=Clr
 |       BoxingAllocations |     Clr |       Default |    16.8597 ns |  1.00 |
 
 # Threading
+
+        [Benchmark(OperationsPerInvoke = 1_000_000)]
+        public void ThreadStatics()
+        {
+            for (int i = 0; i < 1_000_000; i++) GetThreadStatic();
+        }
+
+        [Benchmark]
+        public void TimerContention()
+        {
+            var tasks = new Task[Environment.ProcessorCount];
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = Task.Run(async () =>
+                {
+                    for (int j = 0; j < 50_000; j++)
+                    {
+                        using (var t = new Timer(delegate { }, null, 100_000, -1))
+                        {
+                            await Task.Yield();
+                        }
+                    }
+                });
+            }
+            Task.WaitAll(tasks);
+        }
+
+        [Benchmark]
+        public void SerialCancellationTokenRegistration() =>
+            s_token.Register(() => { }).Dispose();
+
+        [Benchmark(OperationsPerInvoke = 1_000_000)]
+        public void ParallelCancellationTokenRegistration() =>
+            Parallel.For(0, 1_000_000, i => s_token.Register(() => { }).Dispose());
+
+        [Benchmark(OperationsPerInvoke = 10_000)]
+        public async Task AsyncMethodAwaitInvocation()
+        {
+            for (int i = 0; i < 10_000; i++) await MethodAsync();
+        }
+
+
 |                                Method |     Job |     Toolchain |               Mean | Ratio |
 |-------------------------------------- |-------- |-------------- |-------------------:|------:|
 |                         ThreadStatics | Default | .NET Core 2.0 |           9.564 ns |  1.17 |
@@ -132,6 +274,44 @@ Platform=X64  Runtime=Clr
 |            AsyncMethodAwaitInvocation |     Clr |       Default |          69.111 ns |  1.00 |
 
 # String
+
+        [Benchmark]
+        public bool StringEquals() =>
+            "All the world's a stage, and all the men and women merely players: they have their exits and their entrances; and one man in his time plays many parts, his acts being seven ages."
+            .Equals(
+                "All the world's a stage, and all the men and women merely players: they have their exits and their entrances; and one man in his time plays many parts, his acts being seven ages!"
+                );
+
+        [Benchmark]
+        public void StringIndexOf() =>
+            "All the world's a stage, and all the men and women merely players: they have their exits and their entrances; and one man in his time plays many parts, his acts being seven ages."
+            .IndexOf('.');
+
+        [Benchmark]
+        public int IndexOfAny() =>
+            "All the world's a stage, and all the men and women merely players: they have their exits and their entrances; and one man in his time plays many parts, his acts being seven ages."
+            .IndexOfAny(s_chars);
+
+
+        [Benchmark]
+        public string StringToLowerChangesNeeded() =>
+            "This is a test to see what happens when we call ToLower."
+            .ToLower();
+
+        [Benchmark]
+        public string StringToLowerAlreadyCased() =>
+            "this is a test to see what happens when we call tolower."
+            .ToLower();
+
+        [Benchmark]
+        public string[] StringSplit() =>
+            "All the world's a stage, and all the men and women merely players: they have their exits and their entrances; and one man in his time plays many parts, his acts being seven ages."
+            .Split(s_seps);
+
+        [Benchmark]
+        public string StringConcatCharEnumerable() =>
+            string.Concat(Enumerable.Range(0, 1000).Select(i => (char)('a' + i % 26)));
+
 |                     Method |     Job |     Toolchain |         Mean | Ratio |
 |--------------------------- |-------- |-------------- |-------------:|------:|
 |               StringEquals | Default | .NET Core 2.0 |     18.90 ns |  0.89 |
@@ -177,6 +357,44 @@ Platform=X64  Runtime=Clr
 | StringConcatCharEnumerable |     Clr |       Default | 28,958.84 ns |  1.00 |
 
 # FormattingAndParsing
+
+        [Benchmark]
+        public void StringFormat() => string.Format("Test {0}", 123456789);
+
+        [Benchmark]
+        public void StringBuilderAppend()
+        {
+            StringBuilder sb = s_builder;
+            sb.Length = 0;
+
+            for (int i = 0; i < 100_000; i++)
+                sb.Append(i);
+        }
+
+        [Benchmark]
+        public void Int32Formatting() => 123456789.ToString();
+
+        [Benchmark]
+        public void Int32Parsing() => int.Parse("123456789");
+
+        [Benchmark]
+        public void DoubleFormatting() => (1234.5678).ToString();
+
+        [Benchmark]
+        public void BigIntegerFormatting() => s_bi.ToString("X");
+
+        [Benchmark]
+        public void DateTimeOffsetFormatR() => s_dto.ToString("r");
+
+        [Benchmark]
+        public void DateTimeOffsetFormatO() => s_dto.ToString("o");
+
+        [Benchmark]
+        public byte[] ConvertFromBase64String() => Convert.FromBase64String(s_base64String);
+
+        [Benchmark]
+        public byte[] ConvertFromBase64Chars() => Convert.FromBase64CharArray(s_base64Chars, 0, s_base64Chars.Length);
+
 |                  Method |     Job |     Toolchain |            Mean | Ratio |
 |------------------------ |-------- |-------------- |----------------:|------:|
 |            StringFormat | Default | .NET Core 2.0 |       205.53 ns |  1.03 |
@@ -240,6 +458,26 @@ Platform=X64  Runtime=Clr
 |  ConvertFromBase64Chars |     Clr |       Default |     2,082.23 ns |  1.00 |
 
 # Networking
+        [Benchmark]
+        [Obsolete]
+        public long IPAddressNetworkToHostOrder() => IPAddress.NetworkToHostOrder(s_addr);
+
+        [Benchmark]
+        public string UriAllocations() => new Uri("http://127.0.0.1:80").AbsoluteUri;
+
+        [Benchmark]
+        public async Task SocketReceiveThenSend()
+        {
+            byte[] buffer = s_buffer;
+            NetworkStream server = s_server, client = s_client;
+            for (int i = 0; i < 1000; i++)
+            {
+                var read = server.ReadAsync(buffer, 0, buffer.Length);
+                await client.WriteAsync(buffer, 0, buffer.Length);
+                await read;
+            }
+        }
+
 |                      Method |     Job |     Toolchain |               Mean | Ratio |
 |---------------------------- |-------- |-------------- |-------------------:|------:|
 | IPAddressNetworkToHostOrder | Default | .NET Core 2.0 |         11.3764 ns | 1.135 |
@@ -261,6 +499,20 @@ Platform=X64  Runtime=Clr
 |       SocketReceiveThenSend |     Clr |       Default | 61,856,634.5588 ns |  1.00 |
 
 # Networking2
+
+        [Benchmark]
+        public async Task ConcurrentHttpsGets()
+        {
+            await Task.WhenAll(
+                Enumerable
+                .Range(0, Environment.ProcessorCount)
+                .Select(async _ =>
+                {
+                    for (int i = 0; i < 100; i++)
+                        await s_client.GetStringAsync(s_uri);
+                }));
+        }
+
 |              Method |     Job |     Toolchain |      Mean | Ratio |
 |-------------------- |-------- |-------------- |----------:|------:|
 | ConcurrentHttpsGets | Default | .NET Core 2.0 | 171.82 ms |     ? |
@@ -272,6 +524,25 @@ Platform=X64  Runtime=Clr
 Benchmarks with issues:
   Networking2.ConcurrentHttpsGets: Clr(Runtime=Clr)
 # AndMore
+
+        [Benchmark]
+        public void EnumerateFiles()
+        {
+			// Enumerate through local clone of https://github.com/dotnet/wpf.git
+            foreach (string path in Directory.EnumerateFiles(@"D:\Dev\wpf", "*.wpf", SearchOption.AllDirectories))
+            {
+            }
+        }
+
+        [Benchmark]
+        public byte[] DeriveBytes() => s_db.GetBytes(32);
+
+        [Benchmark]
+        public void GuidNewGuid() => Guid.NewGuid();
+
+        [Benchmark]
+        public void RegexCompiled() => s_phoneNumberRegex.IsMatch("555-867-5309");
+
 |         Method |     Job |     Toolchain |             Mean | Ratio |
 |--------------- |-------- |-------------- |-----------------:|------:|
 | EnumerateFiles | Default | .NET Core 2.0 | 15,168,046.09 ns |  1.18 |
